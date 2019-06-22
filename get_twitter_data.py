@@ -3,6 +3,12 @@ import tweepy
 import configparser
 from datetime import datetime
 from janome.tokenizer import Tokenizer
+#頻出数カウント用 janome
+from janome.analyzer import Analyzer
+from janome.tokenfilter import *
+#wordcloud
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 
 #ログ設定
 from logging import getLogger, StreamHandler, DEBUG
@@ -12,12 +18,40 @@ info_str = '[get_twitter_data info]：'
 #形態素解析 関数
 def analysis_word(tweets_data):
     output = []
-    t = Tokenizer()
-    for token in t.tokenize(''.join(tweets_data)):
+    t = Tokenizer('userdic.csv',udic_type="simpledic", udic_enc="utf8")
+    for token in t.tokenize(' '.join(tweets_data)):
         if token.part_of_speech.split(',')[0] in ["名詞"]:
             output.append(token.surface)
     return output
 
+#形態素解析 関数　順位出力
+def analysis_word_rnk(tweets_data):
+    output = []
+    token_filters = [POSKeepFilter('名詞'), TokenCountFilter(sorted=True)]
+    analyzer =  Analyzer(token_filters=token_filters)
+    analyze_count = 0
+    for word,count in analyzer.analyze(' '.join(tweets_data)):
+            analyze_count += 1
+            output.append(word)
+            logger.debug(info_str + '{0}　{1}'.format(word,count))
+            if analyze_count == 10: break
+    return output
+
+#wordCloud 出力関数
+def create_wordcloud(text):
+    fpath = "C:\Windows\Fonts\irohamaru-Regular.ttf"
+    # ストップワードの設定
+    stop_words = [ u'てる', u'いる', u'なる', u'れる', u'する', u'ある', u'こと', u'これ', u'さん', u'して', \
+             u'くれる', u'やる', u'くださる', u'そう', u'せる', u'した',  u'思う',  \
+             u'それ', u'ここ', u'ちゃん', u'くん', u'', u'て',u'に',u'を',u'は',u'の', u'が', u'と', u'た', u'し', u'で', \
+             u'ない', u'も', u'な', u'い', u'か', u'ので', u'よう', u'', u'なっ',u'ちゃう',u'みよ',u'はず',u'なん',u'でる', \
+             u'@',u'RT',u'w',u'ww',u'www',u'wwww',u'wwwww',u'ｗ',u'ｗｗ',u'ｗｗｗ',u'ｗｗｗｗ',u'ｗｗｗｗｗ',u'anju',u'inami']
+
+    wordCloud = WordCloud(background_color="white",font_path=fpath, width=600, height=500, colormap='spring',stopwords=set(stop_words),max_words=30,max_font_size=300).generate(text)
+    plt.figure(figsize=(7,6))
+    plt.imshow(wordCloud)
+    plt.axis("off")
+    #plt.show()
 
 #メイン処理
 #設定読込
@@ -42,7 +76,7 @@ if len(sys.argv) == 3:
 #start_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[1] +'_JST'
 #end_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[2] +'_jST'
 #テスト用
-hashtag = '#アッパレ173'
+hashtag = 'アッパレ173'
 start_time = '2019-06-17_' + '23:15:00' +'_JST'
 end_time = '2019-06-17_' + '23:30:00' +'_JST'
 
@@ -58,18 +92,17 @@ logger.debug(info_str + 'Twitter データ取得を開始します。')
 tweets_data = []
 
 #検索キーワードの設定
-query = '{0} since:{1} until:{2}'
+query = '#{0} since:{1} until:{2}'
 query = query.format(hashtag,start_time,end_time)
 logger.debug(info_str + '検索キーワード ' + query)
 
 exit_flag = True
-exit_flag = False
-loop_count = 0
 max_id = 0
+get_data = 0
+loop_count = 0
 while exit_flag:
     #全件取得するまでループする
     loop_count += 1
-    #logger.debug(info_str + '取得回数 ' + str(loop_count) + '回目')
     #データ取得　２回目以降は前回取得時のmax_idを検索条件に設定する
     if max_id == 0:
         search_results = api.search(q=query,count=100)
@@ -77,23 +110,20 @@ while exit_flag:
         search_results = api.search(q=query,count=100,max_id=max_id)
 
     logger.debug(info_str + '取得回数 ' + str(loop_count) + '回目　／　' + '取得件数 ' + str(len(search_results)) + '件')
-
-    if len(search_results) == 0: break
+    get_data += len(search_results)
+    if len(search_results) <= 1: break
 
     #ツイートデータを格納する
     for result in search_results:
-        tweets_data.append(result.text)
-        max_id = result.id
-        #logger.debug(info_str + str(max_id))
-        #logger.debug(info_str + result.text)
-        #logger.debug(info_str + str(result.created_at))
-    #if loop_count == 20: break
+        if result.is_quote_status == False and result.retweeted is False:
+            tweets_data.append(result.text)
+            max_id = result.id
 
 #形態素解析
 analysed_tweets_data = analysis_word(tweets_data)
 
 #ワードクラウド生成
-font_path = 'irohamaru-Regular.ttf'
+create_wordcloud(' '.join(analysed_tweets_data))
 
 #生成した画像を保存
 
