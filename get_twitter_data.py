@@ -1,4 +1,5 @@
 import sys
+import os
 import tweepy
 import configparser
 from datetime import datetime
@@ -9,6 +10,8 @@ from janome.tokenfilter import *
 #wordcloud
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
+
+import collections
 
 #ログ設定
 from logging import getLogger, StreamHandler, DEBUG
@@ -38,20 +41,16 @@ def analysis_word_rnk(tweets_data):
     return output
 
 #wordCloud 出力関数
-def create_wordcloud(text):
+def create_wordcloud(text,hashtag,stop_words):
     fpath = "C:\Windows\Fonts\irohamaru-Regular.ttf"
-    # ストップワードの設定
-    stop_words = [ u'てる', u'いる', u'なる', u'れる', u'する', u'ある', u'こと', u'これ', u'さん', u'して', \
-             u'くれる', u'やる', u'くださる', u'そう', u'せる', u'した',  u'思う',  \
-             u'それ', u'ここ', u'ちゃん', u'くん', u'', u'て',u'に',u'を',u'は',u'の', u'が', u'と', u'た', u'し', u'で', \
-             u'ない', u'も', u'な', u'い', u'か', u'ので', u'よう', u'', u'なっ',u'ちゃう',u'みよ',u'はず',u'なん',u'でる', \
-             u'@',u'RT',u'w',u'ww',u'www',u'wwww',u'wwwww',u'ｗ',u'ｗｗ',u'ｗｗｗ',u'ｗｗｗｗ',u'ｗｗｗｗｗ',u'anju',u'inami']
-
-    wordCloud = WordCloud(background_color="white",font_path=fpath, width=600, height=500, colormap='spring',stopwords=set(stop_words),max_words=30,max_font_size=300).generate(text)
-    plt.figure(figsize=(7,6))
+    wordCloud = WordCloud(background_color="white",font_path=fpath, width=600, height=500, colormap='spring',stopwords=set(stop_words),max_words=30,max_font_size=300,collocations = False).generate(text)
+    plt.figure(figsize=(6,5))
     plt.imshow(wordCloud)
     plt.axis("off")
     #plt.show()
+    filename = '{0:%Y-%m-%d_}'.format(datetime.now()) + hashtag + '_figure.png'
+    plt.savefig(filename)
+    return filename
 
 #メイン処理
 #設定読込
@@ -63,22 +62,34 @@ access_token = inifile.get('access', 'access_token')
 access_secret = inifile.get('access', 'access_secret')
 #ログ
 logger = LogStraem.get_logger()
+# ストップワードの設定
+stop_words = [ u'てる', u'いる', u'なる', u'れる', u'する', u'ある', u'こと', u'これ', u'さん', u'して', \
+         u'くれる', u'やる', u'くださる', u'そう', u'せる', u'した',  u'思う',  \
+         u'それ', u'ここ', u'ちゃん', u'くん', u'', u'て',u'に',u'を',u'は',u'の', u'が', u'と', u'た', u'し', u'で', \
+         u'ない', u'も', u'な', u'い', u'か', u'ので', u'よう', u'', u'なっ',u'ちゃう',u'みよ',u'はず',u'なん',u'でる', \
+         u'@',u'#',u'RT',u'w',u'ww',u'www',u'wwww',u'wwwww',u'ｗ',u'ｗｗ',u'ｗｗｗ',u'ｗｗｗｗ',u'ｗｗｗｗｗ',u'anju',u'inami',u':',u'0',u'_',u'agqr',u'https', \
+         u'suwananaka',u'(*',u'*)']
 
 #１．引数の判定
-#if not len(sys.argv) == 3:
-if len(sys.argv) == 3:
+if not len(sys.argv) == 3:
+#if len(sys.argv) == 3:
     logger.debug(info_str + '引数の設定に誤りがあります。下記のフォーマットで設定して下さい。')
     logger.debug(info_str + 'python get_twitter_data "hashtag" "開始時間" "終了時間"')
     sys.exit()
 
 #２．引数の受け取り
-#hashtag = sys.argv[0]
-#start_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[1] +'_JST'
-#end_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[2] +'_jST'
+hashtag = sys.argv[0]
+start_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[1] +'_JST'
+end_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[2] +'_jST'
 #テスト用
-hashtag = 'アッパレ173'
-start_time = '2019-06-17_' + '23:15:00' +'_JST'
-end_time = '2019-06-17_' + '23:30:00' +'_JST'
+#hashtag = 'アッパレ173'
+#start_time = '2019-06-17_' + '23:15:00' +'_JST'
+#end_time = '2019-06-17_' + '23:30:00' +'_JST'
+#hashtag = 'fuwasata'
+#start_time = '2019-06-16_' + '21:30:00' +'_JST'
+#end_time = '2019-06-16_' + '22:00:00' +'_JST'
+#ハッシュタグを除外する
+stop_words.append(hashtag)
 
 #３．API認証
 logger.debug(info_str + 'Twitter API認証を開始します。')
@@ -119,12 +130,28 @@ while exit_flag:
             tweets_data.append(result.text)
             max_id = result.id
 
+logger.debug(info_str + 'Twitter データ取得が完了しました。')
+
 #形態素解析
 analysed_tweets_data = analysis_word(tweets_data)
 
-#ワードクラウド生成
-create_wordcloud(' '.join(analysed_tweets_data))
-
-#生成した画像を保存
+#ワードクラウド生成・保存
+logger.debug(info_str + 'ワードクラウドの生成を開始します。')
+filename = create_wordcloud(' '.join(analysed_tweets_data),hashtag,stop_words)
+filename = os.getcwd() + '/' + filename
+#順位化
+collect = collections.Counter(analysed_tweets_data)
+most_word = ''
+word_loop = 0
+while len(most_word) == 0:
+    if not collect.most_common()[word_loop][0] in stop_words:
+        most_word = collect.most_common()[word_loop][0]
+        break
+    word_loop += 1
+logger.debug(info_str + 'ワードクラウドの生成が完了しました。')
+print(collect.most_common(100))
+logger.debug(info_str + filename)
 
 #結果をツイートする
+api.update_with_media(filename = filename,status ='本日最も呟かれたワードは「{0}」でした。  #{1}'.format(most_word,hashtag))
+logger.debug(info_str + 'ツイートが完了しました。')
