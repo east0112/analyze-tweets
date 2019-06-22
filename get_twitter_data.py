@@ -71,16 +71,16 @@ stop_words = [ u'てる', u'いる', u'なる', u'れる', u'する', u'ある',
          u'suwananaka',u'(*',u'*)']
 
 #１．引数の判定
-if not len(sys.argv) == 3:
+if not len(sys.argv) == 4:
 #if len(sys.argv) == 3:
-    logger.debug(info_str + '引数の設定に誤りがあります。下記のフォーマットで設定して下さい。')
+    logger.debug(info_str + '引数の設定に誤りがあります。下記のフォーマットで設定して下さい。' + str(len(sys.argv)))
     logger.debug(info_str + 'python get_twitter_data "hashtag" "開始時間" "終了時間"')
     sys.exit()
 
 #２．引数の受け取り
-hashtag = sys.argv[0]
-start_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[1] +'_JST'
-end_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[2] +'_jST'
+hashtag = sys.argv[1]
+start_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[2] +'_JST'
+end_time = '{0:%Y-%m-%d_}'.format(datetime.now()) + sys.argv[3] +'_jST'
 #テスト用
 #hashtag = 'アッパレ173'
 #start_time = '2019-06-17_' + '23:15:00' +'_JST'
